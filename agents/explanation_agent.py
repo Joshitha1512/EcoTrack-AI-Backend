@@ -1,5 +1,7 @@
-"""ExplanationAgent: Explains why recommended actions help reduce emissions"""
-"""ExplanationAgent: Uses LLM (Groq) with safe fallback"""
+"""
+ExplanationAgent: Explains emissions and recommendations using LLM (Groq)
+with deterministic ranking and safe fallback.
+"""
 
 import os
 from typing import Dict, List, Optional
@@ -33,18 +35,20 @@ class ExplanationAgent:
         previous_total: Optional[float] = None
     ) -> str:
 
-        # ✅ Determine largest category deterministically
+        # -------- Deterministic ranking (CRITICAL FIX) --------
         largest_category = max(emissions, key=emissions.get)
+        largest_value = emissions[largest_category]
 
         # -------- LLM PATH --------
         if self.client:
             try:
                 prompt = self._build_prompt(
-                    emissions,
-                    total_emissions,
-                    recommendations,
-                    previous_total,
-                    largest_category
+                    emissions=emissions,
+                    total=total_emissions,
+                    recommendations=recommendations,
+                    previous_total=previous_total,
+                    largest_category=largest_category,
+                    largest_value=largest_value,
                 )
 
                 completion = self.client.chat.completions.create(
@@ -52,19 +56,18 @@ class ExplanationAgent:
                     messages=[
                         {
                             "role": "system",
-                            "content": "You are a friendly climate sustainability assistant."
+                            "content": "You are a clear, accurate climate sustainability assistant."
                         },
                         {
                             "role": "user",
                             "content": prompt
                         }
                     ],
-                    temperature=0.4,
+                    temperature=0.3,   # lower = more stable
                     max_tokens=200,
                 )
 
                 explanation = completion.choices[0].message.content.strip()
-
                 if explanation:
                     return explanation
 
@@ -83,56 +86,51 @@ class ExplanationAgent:
         total: float,
         recommendations: List[Recommendation],
         previous_total: Optional[float],
-        largest_category: str
+        largest_category: str,
+        largest_value: float
     ) -> str:
 
         rec_text = "\n".join(
-            f"- {r.title}: {r.description} (Potential savings: {r.potential_savings:.1f} kg CO2)"
+            f"- {r.title}: {r.description}"
             for r in recommendations
-        )
-
-        history_text = (
-            f"The user's previous recorded carbon footprint was {previous_total:.1f} kg CO2."
-            if previous_total
-            else "This is the user's first recorded carbon footprint."
         )
 
         return f"""
 A user has an annual carbon footprint of {total:.1f} kg CO2.
-{history_text}
 
-Category breakdown:
+Category breakdown (already calculated — do NOT reinterpret):
 - Transport: {emissions['transport']:.1f} kg
 - Electricity: {emissions['electricity']:.1f} kg
 - Diet: {emissions['diet']:.1f} kg
 
-The largest contributing category is FIXED as "{largest_category}".
+The largest contributing category is:
+- {largest_category.capitalize()} at {largest_value:.1f} kg CO2
 
 Top recommendations:
 {rec_text}
 
-Write a concise, user-friendly explanation using EXACTLY this structure:
+Write using EXACTLY this structure:
 
 Introduction:
-- 1 short sentence stating the total footprint and encouraging the user.
+- One short encouraging sentence mentioning the total footprint.
 
 Emission Breakdown:
-- The largest contributing category is "{largest_category}".
-- Write exactly 2 short sentences explaining WHY this category is the largest.
-- Do NOT choose or infer any other category.
+- One sentence stating that {largest_category} is the largest contributor.
+- One sentence briefly explaining why this category is high.
 
 Recommendations:
-- For EACH recommendation, write ONLY ONE sentence explaining why it helps and one concrete action.
+- Each recommendation must be a separate bullet starting with "- "
+- One sentence per bullet.
 
 Conclusion:
-- 1 short motivational sentence.
+- One short motivational sentence.
 
-Rules:
-- Maximum 150 words TOTAL
-- Do NOT calculate or infer rankings
-- Do NOT invent percentages
-- Use the provided largest category exactly
-- Be clear, simple, and encouraging
+STRICT RULES:
+- NEVER invent categories
+- NEVER mention "total" as a category
+- Use ONLY: transport, electricity, diet
+- Do NOT change the ranking
+- Do NOT use percentages
 """
 
     # ----------------------------
@@ -156,6 +154,6 @@ Rules:
 
         return (
             f"Your total carbon footprint is {total:.1f} kg CO2 per year. "
-            f"The largest contribution comes from {max_category}.{history_line} "
+            f"The largest contributor is {max_category}.{history_line} "
             f"Focusing on improvements in this area can significantly reduce your impact."
         )
