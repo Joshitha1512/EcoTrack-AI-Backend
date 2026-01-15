@@ -99,12 +99,12 @@ class ExplanationAgent:
 A user has an annual carbon footprint of {total:.1f} kg CO2.
 
 Category breakdown (already calculated — do NOT reinterpret):
-- Transport: {emissions['transport']:.1f} kg
-- Electricity: {emissions['electricity']:.1f} kg
-- Diet: {emissions['diet']:.1f} kg
+ Transport: {emissions['transport']:.1f} kg
+ Electricity: {emissions['electricity']:.1f} kg
+ Diet: {emissions['diet']:.1f} kg
 
 The largest contributing category is:
-- {largest_category.capitalize()} at {largest_value:.1f} kg CO2
+ {largest_category.capitalize()} at {largest_value:.1f} kg CO2
 
 Top recommendations:
 {rec_text}
@@ -112,25 +112,25 @@ Top recommendations:
 Write using EXACTLY this structure:
 
 Introduction:
-- One short encouraging sentence mentioning the total footprint.
+ One short encouraging sentence mentioning the total footprint.
 
 Emission Breakdown:
-- One sentence stating that {largest_category} is the largest contributor.
-- One sentence briefly explaining why this category is high.
+ One sentence stating that {largest_category} is the largest contributor.
+ One sentence briefly explaining why this category is high.
 
 Recommendations:
-- Each recommendation must be a separate bullet starting with "- "
-- One sentence per bullet.
+ Each recommendation must be a separate bullet starting with "- "
+ One sentence per bullet.
 
 Conclusion:
-- One short motivational sentence.
+ One short motivational sentence.
 
 STRICT RULES:
-- NEVER invent categories
-- NEVER mention "total" as a category
-- Use ONLY: transport, electricity, diet
-- Do NOT change the ranking
-- Do NOT use percentages
+ NEVER invent categories
+ NEVER mention "total" as a category
+ Use ONLY: transport, electricity, diet
+ Do NOT change the ranking
+ Do NOT use percentages
 """
 
     # ----------------------------
