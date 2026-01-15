@@ -1,0 +1,18 @@
+# -------- ENV & SECRETS --------
+.env
+
+# -------- PYTHON --------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# -------- VIRTUAL ENV --------
+venv/
+.env/
+.env.*
+
+# -------- IDE / OS --------
+.DS_Store
+.vscode/
+.idea/
