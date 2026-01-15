@@ -1,3 +1,7 @@
+"""ExplanationAgent: Explains why recommended actions help reduce emissions"""
+
+"""ExplanationAgent: Uses LLM (Groq) with safe fallback"""
+
 import os
 from typing import Dict, List, Optional
 
@@ -41,7 +45,7 @@ class ExplanationAgent:
                 )
 
                 completion = self.client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model="llama-3.1-8b-instant",  
                     messages=[
                         {
                             "role": "system",
@@ -58,28 +62,14 @@ class ExplanationAgent:
 
                 explanation = completion.choices[0].message.content.strip()
 
-                # Ensure required headers exist
-                if all(
-                    key in explanation
-                    for key in [
-                        "Introduction:",
-                        "Emission Breakdown:",
-                        "Recommendations:",
-                        "Conclusion:"
-                    ]
-                ):
+                if explanation:
                     return explanation
 
             except Exception as e:
                 print("Groq LLM failed, using fallback:", e)
 
         # -------- FALLBACK --------
-        return self._fallback_explanation(
-            emissions,
-            total_emissions,
-            recommendations,
-            previous_total
-        )
+        return self._fallback_explanation(emissions, total_emissions, previous_total)
 
     # ----------------------------
     # Prompt builder
@@ -98,14 +88,14 @@ class ExplanationAgent:
         )
 
         history_text = (
-            f"The user's previous recorded carbon footprint was {previous_total:.1f} kg CO2."
+            f"The user's previous recorded carbon footprint was {previous_total:.1f} kg CO2. "
+            f"Compare it with the current footprint and comment on the change."
             if previous_total
             else "This is the user's first recorded carbon footprint."
         )
 
         return f"""
 A user has an annual carbon footprint of {total:.1f} kg CO2.
-{history_text}
 
 Category breakdown:
 - Transport: {emissions['transport']:.1f} kg
@@ -137,47 +127,26 @@ Rules:
 """
 
     # ----------------------------
-    # Structured deterministic fallback
+    # Deterministic fallback
     # ----------------------------
     def _fallback_explanation(
         self,
         emissions: Dict,
-        total: float,
-        recommendations: List[Recommendation],
+        total: float,  # Parameter is 'total'
         previous_total: Optional[float]
     ) -> str:
 
-        sorted_categories = sorted(
-            emissions.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
-
-        largest_category, largest_value = sorted_categories[0]
-
-        rec_lines = "\n".join(
-            f"- {r.title}: Focus on small habit changes that reduce emissions in this area."
-            for r in recommendations
-        )
+        max_category = max(emissions, key=emissions.get)
 
         history_line = (
             f" Compared to your previous footprint of {previous_total:.1f} kg CO2, "
-            f"this is a change of {total - previous_total:+.1f} kg."
+            f"this shows a change of {total - previous_total:+.1f} kg."  # Fixed: Use 'total' instead of 'total_emissions'
             if previous_total
             else ""
         )
 
-        return f"""
-Introduction:
-Your annual carbon footprint is approximately {total:.1f} kg CO2.{history_line}
-
-Emission Breakdown:
-The largest contribution comes from {largest_category}, making it the most impactful area to improve.
-Reducing emissions here can significantly lower your overall footprint.
-
-Recommendations:
-{rec_lines}
-
-Conclusion:
-Small, consistent actions can make a meaningful difference over time.
-""".strip()
+        return (
+            f"Your total carbon footprint is {total:.1f} kg CO2 per year. "  # Fixed: Use 'total'
+            f"The largest contribution comes from {max_category}.{history_line} "
+            f"Focusing on improvements in this area can significantly reduce your impact."
+        )
