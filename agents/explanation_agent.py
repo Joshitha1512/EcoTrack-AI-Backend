@@ -1,5 +1,4 @@
 """ExplanationAgent: Explains why recommended actions help reduce emissions"""
-
 """ExplanationAgent: Uses LLM (Groq) with safe fallback"""
 
 import os
@@ -34,6 +33,9 @@ class ExplanationAgent:
         previous_total: Optional[float] = None
     ) -> str:
 
+        # ✅ Determine largest category deterministically
+        largest_category = max(emissions, key=emissions.get)
+
         # -------- LLM PATH --------
         if self.client:
             try:
@@ -41,11 +43,12 @@ class ExplanationAgent:
                     emissions,
                     total_emissions,
                     recommendations,
-                    previous_total
+                    previous_total,
+                    largest_category
                 )
 
                 completion = self.client.chat.completions.create(
-                    model="llama-3.1-8b-instant",  
+                    model="llama-3.1-8b-instant",
                     messages=[
                         {
                             "role": "system",
@@ -56,7 +59,7 @@ class ExplanationAgent:
                             "content": prompt
                         }
                     ],
-                    temperature=0.5,
+                    temperature=0.4,
                     max_tokens=200,
                 )
 
@@ -79,7 +82,8 @@ class ExplanationAgent:
         emissions: Dict,
         total: float,
         recommendations: List[Recommendation],
-        previous_total: Optional[float]
+        previous_total: Optional[float],
+        largest_category: str
     ) -> str:
 
         rec_text = "\n".join(
@@ -88,19 +92,21 @@ class ExplanationAgent:
         )
 
         history_text = (
-            f"The user's previous recorded carbon footprint was {previous_total:.1f} kg CO2. "
-            f"Compare it with the current footprint and comment on the change."
+            f"The user's previous recorded carbon footprint was {previous_total:.1f} kg CO2."
             if previous_total
             else "This is the user's first recorded carbon footprint."
         )
 
         return f"""
 A user has an annual carbon footprint of {total:.1f} kg CO2.
+{history_text}
 
 Category breakdown:
 - Transport: {emissions['transport']:.1f} kg
 - Electricity: {emissions['electricity']:.1f} kg
 - Diet: {emissions['diet']:.1f} kg
+
+The largest contributing category is FIXED as "{largest_category}".
 
 Top recommendations:
 {rec_text}
@@ -111,7 +117,9 @@ Introduction:
 - 1 short sentence stating the total footprint and encouraging the user.
 
 Emission Breakdown:
-- 2 short sentences explaining which category contributes the most and why.
+- The largest contributing category is "{largest_category}".
+- Write exactly 2 short sentences explaining WHY this category is the largest.
+- Do NOT choose or infer any other category.
 
 Recommendations:
 - For EACH recommendation, write ONLY ONE sentence explaining why it helps and one concrete action.
@@ -121,8 +129,9 @@ Conclusion:
 
 Rules:
 - Maximum 150 words TOTAL
-- No percentages unless necessary
-- Do NOT exaggerate savings
+- Do NOT calculate or infer rankings
+- Do NOT invent percentages
+- Use the provided largest category exactly
 - Be clear, simple, and encouraging
 """
 
@@ -132,7 +141,7 @@ Rules:
     def _fallback_explanation(
         self,
         emissions: Dict,
-        total: float,  # Parameter is 'total'
+        total: float,
         previous_total: Optional[float]
     ) -> str:
 
@@ -140,13 +149,13 @@ Rules:
 
         history_line = (
             f" Compared to your previous footprint of {previous_total:.1f} kg CO2, "
-            f"this shows a change of {total - previous_total:+.1f} kg."  # Fixed: Use 'total' instead of 'total_emissions'
+            f"this shows a change of {total - previous_total:+.1f} kg."
             if previous_total
             else ""
         )
 
         return (
-            f"Your total carbon footprint is {total:.1f} kg CO2 per year. "  # Fixed: Use 'total'
+            f"Your total carbon footprint is {total:.1f} kg CO2 per year. "
             f"The largest contribution comes from {max_category}.{history_line} "
             f"Focusing on improvements in this area can significantly reduce your impact."
         )
